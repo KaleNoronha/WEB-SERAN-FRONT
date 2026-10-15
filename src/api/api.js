@@ -1,7 +1,7 @@
 import axios from "axios"
 
 const api = axios.create({
-  baseURL: "https://web-seran-api.onrender.com",
+  baseURL: "https://web-seran-api-9nyk.onrender.com",
 })
 
 api.interceptors.request.use((config) => {
