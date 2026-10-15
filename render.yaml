@@ -1,0 +1,14 @@
+# Exported from Render on 2026-10-15T16:36:11Z
+version: "1"
+services:
+- type: web
+  name: WEB-SERAN-FRONT
+  runtime: static
+  repo: https://github.com/KaleNoronha/WEB-SERAN-FRONT
+  buildCommand: pnpm install && pnpm run build
+  staticPublishPath: dist
+  routes:
+  - type: rewrite
+    source: /*
+    destination: /index.html
+  autoDeployTrigger: commit
