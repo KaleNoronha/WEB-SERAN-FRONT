@@ -243,7 +243,9 @@ export default function Perfil() {
                 </div>
                 <div>
                   <p className="text-xs text-slate-400">Hospital</p>
-                  <p className="text-xs text-slate-800 mt-0.5">{usuario?.hospital}</p>
+                  <p className="text-xs text-slate-800 mt-0.5">
+                    {usuario?.hospital || "No asignado"}
+                  </p>
                 </div>
               </div>
             </div>
