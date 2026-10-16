@@ -10,6 +10,7 @@ import HistorialPacientes from "../pages/HistorialPacientes"
 import DetallePaciente from "../pages/DetallePaciente"
 import IniciarEvaluacion from "../pages/IniciarEvaluacion"
 import ConfigRecomendaciones from "../pages/ConfigRecomendaciones"
+import RestablecerPassword from "../pages/RestablecerPassword"
 
 function RutaProtegida({ children }) {
   const { usuario, cargando } = useAuth()
@@ -61,6 +62,10 @@ export default function AppRoutes() {
       <Route path="/" element={<Navigate to="/login" />} />
       <Route path="/login" element={<Login />} />
       <Route path="/recuperar-password" element={<RecuperarPassword />} />
+      <Route
+        path="/restablecer-password/:token"
+        element={<RestablecerPassword />}
+      />
       <Route path="/registro-doctor/:token" element={<Registro />} />
       <Route path="/admin/usuarios" element={<RutaAdmin><GestionUsuarios /></RutaAdmin>} />
       <Route path="/doctor/pacientes/nuevo" element={<RutaDoctor><RegistroPaciente /></RutaDoctor>} />
