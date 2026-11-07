@@ -487,7 +487,7 @@ async function cargarUsuariosEInvitaciones() {
 
 
 
-  await cargarUsuariosEInvitaciones()&#x20;
+  await cargarUsuariosEInvitaciones();
 
 
 
