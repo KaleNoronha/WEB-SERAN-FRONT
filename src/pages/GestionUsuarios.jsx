@@ -10,9 +10,17 @@ const estadoBadge = {
   inactivo: "bg-slate-100 text-slate-500",
 }
 
-function FiltroInput({ placeholder, value, onChange, opciones, className = "w-52" }) {
+function FiltroInput({
+  placeholder,
+  value,
+  onChange,
+  opciones,
+  className = "w-52",
+  textoInicial = "",
+  onTextoChange,
+}) {
   const [abierto, setAbierto] = useState(false)
-  const [texto, setTexto] = useState("")
+  const [texto, setTexto] = useState(textoInicial)
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0 })
   const ref = useRef(null)
   const portalRef = useRef(null)
@@ -37,7 +45,11 @@ function FiltroInput({ placeholder, value, onChange, opciones, className = "w-52
   }
 
   const opcionesUnicas = [...new Set(opciones)]
-  const opcionesFiltradas = opcionesUnicas.filter(o => o.toLowerCase().includes(texto.toLowerCase()))
+  const textoVisible = onTextoChange ? textoInicial : texto
+
+  const opcionesFiltradas = opcionesUnicas.filter(o =>
+    o.toLowerCase().includes(textoVisible.toLowerCase())
+  )
 
   function toggle(opcion) {
     onChange(prev => prev.includes(opcion) ? prev.filter(v => v !== opcion) : [...prev, opcion])
