@@ -783,10 +783,21 @@ useEffect(() => {
 
         {/* Barra de progreso */}
         <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <div className="flex flex-wrap gap-3 mb-3 text-xs" aria-label="Leyenda del progreso">
-            <span className="flex items-center gap-1.5"><span aria-hidden="true">✓</span> Completada</span>
-            <span className="flex items-center gap-1.5"><span aria-hidden="true">●</span> Actual</span>
-            <span className="flex items-center gap-1.5"><span aria-hidden="true">○</span> Pendiente</span>
+          <div className="flex flex-wrap gap-4 mb-3 text-xs" aria-label="Leyenda del progreso">
+            <span className="flex items-center gap-2">
+              <span className="w-4 h-2 rounded-sm bg-slate-800"></span>
+              Completada
+            </span>
+
+            <span className="flex items-center gap-2">
+              <span className="w-4 h-2 rounded-sm bg-slate-400"></span>
+              Actual
+            </span>
+
+            <span className="flex items-center gap-2">
+              <span className="w-4 h-2 rounded-sm bg-white border border-slate-300"></span>
+              Pendiente
+            </span>
           </div>
           <div className="flex gap-1.5" aria-label="Progreso de la evaluación">
             {SECCIONES.map((s, i) => (
