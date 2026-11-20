@@ -122,7 +122,7 @@ export default function Perfil() {
   function ErrorCampo({ campo }) {
     if (!errores[campo]) return null
     return (
-      <p className={`text-red-700 text-xs mt-1 transition-opacity duration-500 ${erroresVisibles[campo] ? "opacity-100" : "opacity-0"}`}>
+      <p role="alert" className="text-red-700 text-xs mt-1">
         {errores[campo]}
       </p>
     )
