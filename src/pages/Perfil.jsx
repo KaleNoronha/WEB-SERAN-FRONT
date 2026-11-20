@@ -14,7 +14,6 @@ function getIniciales(nombre, apellido) {
 export default function Perfil() {
   const navigate = useNavigate()
   const { usuario, logout } = useAuth()
-  console.log("USUARIO PERFIL:", usuario)
   const [modalLogout, setModalLogout] = useState(false)
   const [editando, setEditando] = useState(false)
 
@@ -22,8 +21,8 @@ export default function Perfil() {
   const [apellido, setApellido] = useState(usuario?.apellidos ?? usuario?.apellido ?? "")
   const [correo, setCorreo] = useState(usuario?.correo ?? usuario?.email ?? "")
   const [colegiatura, setColegiatura] = useState(usuario?.colegiatura ?? "")
-  const [nombreGuardado, setNombreGuardado] = useState(usuario?.nombre ?? "")
-  const [apellidoGuardado, setApellidoGuardado] = useState(usuario?.apellido ?? "")
+  const [nombreGuardado, setNombreGuardado] = useState(usuario?.nombres ?? usuario?.nombre ?? "")
+  const [apellidoGuardado, setApellidoGuardado] = useState(usuario?.apellidos ?? usuario?.apellido ?? "")
   const [colegiaturaGuardada, setColegiaturaGuardada] = useState(usuario?.colegiatura ?? "")
   const [errores, setErrores] = useState({})
   const [erroresVisibles, setErroresVisibles] = useState({})
@@ -33,7 +32,7 @@ export default function Perfil() {
   const esDoctor = usuario?.rol === "doctor"
   const modificado = nombre !== nombreGuardado || apellido !== apellidoGuardado || (esDoctor && colegiatura !== colegiaturaGuardada)
   const nombreUsuario = `${nombreGuardado.split(" ")[0]} ${apellidoGuardado.split(" ")[0]}`
-  const soloLetras = /^[a-zA-záéíóúÁÉÍÓÚñÑüÜ\s]*$/
+  const soloLetras = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:[ '-][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*$/
 
   useEffect(() => {
     if (!usuario) return
@@ -67,23 +66,44 @@ export default function Perfil() {
     setEditando(false)
   }
 
-  async function handleGuardar() {
+  async function handleGuardar(e) {
+    e?.preventDefault()
+    const nuevosErrores = {}
+    const nombresLimpios = nombre.trim()
+    const apellidosLimpios = apellido.trim()
+    const colegiaturaLimpia = colegiatura.trim()
+
+    if (!nombresLimpios) nuevosErrores.nombre = "Ingresa tus nombres"
+    else if (!soloLetras.test(nombresLimpios)) nuevosErrores.nombre = "Solo se permiten letras en los nombres"
+
+    if (!apellidosLimpios) nuevosErrores.apellido = "Ingresa tus apellidos"
+    else if (!soloLetras.test(apellidosLimpios)) nuevosErrores.apellido = "Solo se permiten letras en los apellidos"
+
+    if (esDoctor) {
+      if (!colegiaturaLimpia) nuevosErrores.colegiatura = "Ingresa tu número de colegiatura"
+      else if (!/^CMP\d{4,6}$/.test(colegiaturaLimpia)) {
+        nuevosErrores.colegiatura = "Formato inválido. Ejemplo: CMP12345"
+      }
+    }
+
+    setErrores(nuevosErrores)
+    if (Object.keys(nuevosErrores).length > 0) return
+
     try {
-      const response = await api.put("/api/auth/me", {
-        nombres: nombre.trim(),
-        apellidos: apellido.trim(),
-        colegiatura: colegiatura.trim(),
-        telefono: usuario?.telefono ?? null,
-      })
+      const payload = {
+        nombres: nombresLimpios,
+        apellidos: apellidosLimpios,
+      }
+      if (esDoctor) payload.colegiatura = colegiaturaLimpia
+
+      const response = await api.put("/api/auth/me", payload)
 
       setNombre(response.data.nombres ?? "")
       setApellido(response.data.apellidos ?? "")
       setColegiatura(response.data.colegiatura ?? "")
-
       setNombreGuardado(response.data.nombres ?? "")
       setApellidoGuardado(response.data.apellidos ?? "")
       setColegiaturaGuardada(response.data.colegiatura ?? "")
-
       setEditando(false)
       setExito(true)
       setExitoVisible(false)
@@ -94,7 +114,8 @@ export default function Perfil() {
       }, 3000)
     } catch (error) {
       console.error("Error al actualizar perfil:", error)
-      alert("No se pudo actualizar el perfil.")
+      const detail = error.response?.data?.detail
+      mostrarError("general", typeof detail === "string" ? detail : "No se pudo actualizar el perfil")
     }
   }
 
@@ -190,6 +211,7 @@ export default function Perfil() {
                       <ErrorCampo campo="colegiatura" />
                     </div>
                   )}
+                  {errores.general && <p role="alert" className="text-xs text-red-700">{errores.general}</p>}
                   <div className="flex gap-3 justify-end pt-2">
                     <button
                       type="button"
