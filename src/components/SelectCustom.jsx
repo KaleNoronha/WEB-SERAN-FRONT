@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { ChevronDown } from "lucide-react"
 
-export default function SelectCustom({ placeholder, value, onChange, opciones, className = "w-full" }) {
+export default function SelectCustom({ placeholder, value, onChange, opciones, className = "w-full", disabled = false }) {
   const [abierto, setAbierto] = useState(false)
   const [busqueda, setBusqueda] = useState("")
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0 })
@@ -13,7 +13,7 @@ export default function SelectCustom({ placeholder, value, onChange, opciones, c
     function handleClickOutside(e) {
       if (
         ref.current && !ref.current.contains(e.target) &&
-        portalRef.current && !portalRef.current.contains(e.target)
+        (!portalRef.current || !portalRef.current.contains(e.target))
       ) {
         setAbierto(false)
         setBusqueda("")
@@ -23,7 +23,16 @@ export default function SelectCustom({ placeholder, value, onChange, opciones, c
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
+  // El estado disabled también debe cerrar el menú (renderizado en un portal).
+  useEffect(() => {
+    if (disabled) {
+      setAbierto(false)
+      setBusqueda("")
+    }
+  }, [disabled])
+
   function handleOpen() {
+    if (disabled) return
     if (ref.current) {
       const r = ref.current.getBoundingClientRect()
       setPos({ top: r.bottom + 8, left: r.left, width: r.width })
@@ -35,27 +44,29 @@ export default function SelectCustom({ placeholder, value, onChange, opciones, c
   const opcionesFiltradas = opciones.filter(o => o.label.toLowerCase().includes(busqueda.toLowerCase()))
 
   function seleccionar(opcion) {
+    if (disabled) return
     onChange(opcion.value)
     setAbierto(false)
     setBusqueda("")
   }
 
   return (
-    <div className={`relative ${className}`} ref={ref}>
-      <div className="w-full flex items-center border border-slate-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-slate-500 bg-white">
+    <div className={`relative ${className}`} ref={ref} aria-disabled={disabled}>
+      <div className={`w-full flex items-center border border-slate-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-slate-500 ${disabled ? "bg-slate-100" : "bg-white"}`}>
         <input
           type="text"
+          disabled={disabled}
           placeholder={seleccionado ? seleccionado.label : placeholder}
           value={busqueda}
-          onChange={e => { setBusqueda(e.target.value); handleOpen() }}
+          onChange={e => { if (!disabled) { setBusqueda(e.target.value); handleOpen() } }}
           onFocus={handleOpen}
-          className="flex-1 px-3 py-2 text-xs focus:outline-none bg-white"
+          className="flex-1 min-w-0 px-3 py-2 text-xs focus:outline-none bg-transparent disabled:cursor-not-allowed"
         />
-        <button type="button" onClick={() => abierto ? setAbierto(false) : handleOpen()} className="px-2 text-slate-400 hover:text-slate-600">
+        <button type="button" disabled={disabled} aria-label="Mostrar opciones" aria-expanded={abierto && !disabled} onClick={() => abierto ? setAbierto(false) : handleOpen()} className="px-2 text-slate-400 hover:text-slate-600 disabled:cursor-not-allowed">
           <ChevronDown size={12} className={`transition-transform ${abierto ? "rotate-180" : ""}`} />
         </button>
       </div>
-      {abierto && createPortal(
+      {abierto && !disabled && createPortal(
         <div
           ref={portalRef}
           className="fixed bg-white border border-slate-100 rounded-xl shadow-xl z-[9999] overflow-y-auto max-h-48"

@@ -403,6 +403,7 @@ export default function IniciarEvaluacion() {
   const [erroresVisibles, setErroresVisibles] = useState({})
   const [completadas, setCompletadas] = useState([])
   const [finalizado, setFinalizado] = useState(false)
+  const [guardando, setGuardando] = useState(false)
   const [resultadoFinal, setResultadoFinal] = useState(null)
   const [evaluacionId, setEvaluacionId] = useState(null)
   const [modoContinuar, setModoContinuar] = useState(false)
@@ -490,6 +491,9 @@ useEffect(() => {
 }
 
   function actualizarRespuesta(campo, valor) {
+    // No aceptar eventos de controles que dependan de una pregunta sin habilitar.
+    const pregunta = SECCIONES.flatMap(seccion => seccion.preguntas).find(p => p.id === campo)
+    if (pregunta?.dependeDe && respuestas[pregunta.dependeDe] !== pregunta.mostrarSi) return
     let valorFinal = valor
 
     if (campo === "valorHemoglobina" && typeof valorFinal === "string") {
@@ -566,9 +570,9 @@ useEffect(() => {
           valido = false
         } else if (
           val !== "no_recuerda" &&
-          (isNaN(valNormalizado) || Number(valNormalizado) <= 0)
+          (!Number.isFinite(Number(valNormalizado)) || Number(valNormalizado) <= 0 || Number(valNormalizado) > 25.6)
         ) {
-          mostrarError(p.id, "Ingresa un valor decimal válido")
+          mostrarError(p.id, "Ingresa un valor de hemoglobina mayor que 0 y hasta 25.6 g/dL")
           valido = false
         }
       } else if (p.tipo === "fecha") {
@@ -590,6 +594,7 @@ useEffect(() => {
   }
 
   async function handleFinalizar() {
+    if (guardando) return
     if (!validarSeccion()) return
 
     if (!evaluacionId) {
@@ -598,6 +603,7 @@ useEffect(() => {
     }
 
     setCompletadas(prev => [...new Set([...prev, seccionActual])])
+    setGuardando(true)
 
     try {
       const respuestasBackend = Object.entries(respuestas)
@@ -652,6 +658,8 @@ useEffect(() => {
       } else {
         alert("No se pudo finalizar la evaluación.")
       }
+    } finally {
+      setGuardando(false)
     }
   }
 
@@ -666,6 +674,7 @@ useEffect(() => {
     setErrores({})
     setCompletadas([])
     setFinalizado(false)
+    setGuardando(false)
   }
 
   const inputClass = "w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
@@ -687,6 +696,7 @@ useEffect(() => {
         <div className="flex flex-col items-center justify-center flex-1 gap-4 py-12">
           <CheckCircle2 size={48} className="text-green-600" />
           <h1 className="text-xl font-bold text-slate-800">Evaluación completada</h1>
+          <p role="status" className="text-sm text-green-700">Evaluación guardada exitosamente.</p>
           <p className="text-xs text-slate-500">Paciente: <span className="font-medium text-slate-700">{paciente?.nombres} {paciente?.apellidos}</span></p>
           <div className={`px-4 py-2 rounded-full text-sm font-semibold border ${badge[riesgo] ?? badge.bajo}`}>
             Nivel de riesgo: {riesgo.charAt(0).toUpperCase() + riesgo.slice(1)}
@@ -773,13 +783,19 @@ useEffect(() => {
 
         {/* Barra de progreso */}
         <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <div className="flex gap-1.5">
+          <div className="flex flex-wrap gap-3 mb-3 text-xs" aria-label="Leyenda del progreso">
+            <span className="flex items-center gap-1.5"><span aria-hidden="true">✓</span> Completada</span>
+            <span className="flex items-center gap-1.5"><span aria-hidden="true">●</span> Actual</span>
+            <span className="flex items-center gap-1.5"><span aria-hidden="true">○</span> Pendiente</span>
+          </div>
+          <div className="flex gap-1.5" aria-label="Progreso de la evaluación">
             {SECCIONES.map((s, i) => (
               <div key={s.id} className="flex-1 flex flex-col items-center gap-1">
                 <div className={`h-1.5 w-full rounded-full transition-colors ${
                   completadas.includes(i) ? "bg-slate-800" : i === seccionActual ? "bg-slate-400" : "bg-slate-100"
                 }`} />
-                <span className={`text-[10px] text-center leading-tight hidden sm:block ${
+                <span className="text-[10px] sr-only">{completadas.includes(i) ? "Completada" : i === seccionActual ? "Actual" : "Pendiente"}: {s.titulo}</span>
+                <span aria-hidden="true" className={`text-[10px] text-center leading-tight hidden sm:block ${
                   completadas.includes(i) ? "text-slate-800 font-medium" : i === seccionActual ? "text-slate-600" : "text-slate-300"
                 }`}>{s.titulo}</span>
               </div>
@@ -793,13 +809,14 @@ useEffect(() => {
           {seccion.preguntas.map(p => {
             const bloqueada = p.dependeDe && respuestas[p.dependeDe] !== p.mostrarSi
             return (
-            <div key={p.id} className={bloqueada ? "opacity-40 pointer-events-none select-none" : ""}>
+            <div key={p.id} className={bloqueada ? "opacity-40" : ""} aria-disabled={Boolean(bloqueada)}>
               <p className="text-xs font-medium text-slate-700 mb-2">{p.texto}</p>
               {p.tipo === "booleano" && (
                 <div className="flex gap-2">
                   {opcionesDePregunta(p).map(op => (
                     <button
                       key={op.value}
+                      disabled={Boolean(bloqueada)}
                       onClick={() => actualizarRespuesta(p.id, op.value)}
                       className={`flex-1 py-2 text-xs font-medium rounded-lg border transition-colors ${
                         respuestas[p.id] === op.value
@@ -815,6 +832,7 @@ useEffect(() => {
               {(p.tipo === "numero" || p.tipo === "decimal") && (
                 <input
                   type="text"
+                  disabled={Boolean(bloqueada)}
                   placeholder={p.placeholder}
                   value={respuestas[p.id]}
                   onChange={e => { setRespuestas(prev => ({ ...prev, [p.id]: e.target.value })); setErrores(prev => ({ ...prev, [p.id]: "" })) }}
@@ -829,11 +847,12 @@ useEffect(() => {
                     value={respuestas[p.id] === "no_recuerda" ? "" : respuestas[p.id]}
                     onChange={e => actualizarRespuesta(p.id, e.target.value)}
                     className={inputClass}
-                    disabled={respuestas[p.id] === "no_recuerda"}
+                    disabled={Boolean(bloqueada) || respuestas[p.id] === "no_recuerda"}
                   />
 
                   <button
                     type="button"
+                    disabled={Boolean(bloqueada)}
                     onClick={() =>
                       actualizarRespuesta(
                         p.id,
@@ -853,6 +872,7 @@ useEffect(() => {
               {p.tipo === "fecha" && (
                 <input
                   type="date"
+                  disabled={Boolean(bloqueada)}
                   value={respuestas[p.id]}
                   max={new Date().toISOString().split("T")[0]}
                   onChange={e => { setRespuestas(prev => ({ ...prev, [p.id]: e.target.value })); setErrores(prev => ({ ...prev, [p.id]: "" })) }}
@@ -862,6 +882,7 @@ useEffect(() => {
               {p.tipo === "opcion" && (
                 <SelectCustom
                   placeholder="Selecciona..."
+                  disabled={Boolean(bloqueada)}
                   value={respuestas[p.id]}
                   onChange={v => actualizarRespuesta(p.id, v)}
                   opciones={opcionesDePregunta(p)}
@@ -887,8 +908,8 @@ useEffect(() => {
             Anterior
           </button>
           {esUltima ? (
-            <button onClick={handleFinalizar} className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium px-6 py-2 rounded-lg transition-colors">
-              Finalizar evaluación
+            <button onClick={handleFinalizar} disabled={guardando} className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-medium px-6 py-2 rounded-lg transition-colors">
+              {guardando ? "Guardando evaluación..." : "Finalizar evaluación"}
             </button>
           ) : (
             <button onClick={handleSiguiente} className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium px-6 py-2 rounded-lg transition-colors">
