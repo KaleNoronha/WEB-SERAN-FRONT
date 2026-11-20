@@ -41,6 +41,104 @@ function Campo({ label, value }) {
   )
 }
 
+// Explicaciones descriptivas del puntaje sin alterar las reglas del backend.
+// Se usan los códigos reales del motor para las evaluaciones históricas.
+const MOTIVOS_RIESGO = {
+  prematuro: "El antecedente de nacimiento prematuro es un factor considerado en la estimación de riesgo.",
+  bajo_peso_nacer: "El antecedente de bajo peso al nacer aporta al riesgo perinatal.",
+  anemia_materna_embarazo: "El antecedente de anemia materna durante el embarazo se considera un factor de riesgo.",
+  frecuencia_consumo_hierro: "La frecuencia registrada de consumo de alimentos ricos en hierro aporta al riesgo nutricional.",
+  consume_hierro: "La frecuencia registrada de consumo de alimentos ricos en hierro aporta al riesgo nutricional.",
+  frecuencia_consumo_menestras: "La frecuencia registrada de consumo de menestras aporta al riesgo nutricional.",
+  consume_menestras: "La frecuencia registrada de consumo de menestras aporta al riesgo nutricional.",
+  dieta_baja_hierro: "La alimentación descrita incluye poco hierro y se considera un factor nutricional de riesgo.",
+  dieta_carbohidratos: "El predominio de carbohidratos con poco hierro se considera un factor nutricional de riesgo.",
+  alimentacion_complementaria_6m: "La respuesta registrada sobre el inicio de la alimentación complementaria aporta al riesgo nutricional.",
+  alimentacion_complementaria: "La respuesta registrada sobre el inicio de la alimentación complementaria aporta al riesgo nutricional.",
+  buen_apetito: "La falta de buen apetito se considera un indicador de riesgo nutricional.",
+  recibe_suplemento_hierro: "La ausencia de suplementación con hierro se considera un factor de riesgo.",
+  recibe_hierro_micronutrientes: "La ausencia de suplementación con hierro se considera un factor de riesgo.",
+  adherencia_suplemento_hierro: "La frecuencia de consumo del suplemento registrada puede limitar su aporte preventivo.",
+  toma_suplemento_diario: "La frecuencia de consumo del suplemento registrada puede limitar su aporte preventivo.",
+  asiste_cred: "La falta de asistencia a controles CRED reduce las oportunidades de seguimiento preventivo.",
+  asiste_controles_cred: "La falta de asistencia a controles CRED reduce las oportunidades de seguimiento preventivo.",
+  ultimo_control_salud: "El tiempo transcurrido desde el último control se considera en la estimación de riesgo.",
+  tiempo_ultimo_control: "El tiempo transcurrido desde el último control se considera en la estimación de riesgo.",
+  palidez: "La palidez observada es un signo considerado en la estimación de riesgo.",
+  cansancio_decaimiento: "El cansancio o decaimiento reportado se considera un signo de riesgo.",
+  perdida_apetito: "La pérdida de apetito reportada se considera un signo de riesgo.",
+  diarrea_reciente: "La diarrea reciente se considera un factor de riesgo relacionado con la salud del niño.",
+  infecciones_recientes: "La presencia de infecciones recientes se considera un factor de riesgo.",
+  infecciones_frecuentes: "La presencia de infecciones frecuentes se considera un factor de riesgo.",
+  parasitosis: "La parasitosis reportada se considera un factor de riesgo.",
+  parasitos: "La parasitosis reportada se considera un factor de riesgo.",
+  desparasitacion: "La ausencia de desparasitación se considera un factor de riesgo.",
+  desparasitado: "La ausencia de desparasitación se considera un factor de riesgo.",
+  agua_segura: "La falta de acceso a agua segura se considera un factor de riesgo sanitario.",
+  bajo_peso_edad: "El bajo peso observado por personal de salud aporta al riesgo nutricional.",
+  bajo_peso_observado: "El bajo peso observado por personal de salud aporta al riesgo nutricional.",
+  talla_baja_edad: "La talla baja observada por personal de salud aporta al riesgo nutricional.",
+  baja_talla_observado: "La talla baja observada por personal de salud aporta al riesgo nutricional.",
+  delgadez_edad: "La delgadez observada por personal de salud aporta al riesgo nutricional.",
+  delgadez_observado: "La delgadez observada por personal de salud aporta al riesgo nutricional.",
+  frecuencia_inseguridad_alimentaria: "La frecuencia reportada de falta de alimentos en el hogar aporta al riesgo nutricional.",
+  inseguridad_alimentaria: "La frecuencia reportada de falta de alimentos en el hogar aporta al riesgo nutricional.",
+  hemoglobina_medida: "No contar con una medición de hemoglobina registrada limita la información disponible para la evaluación.",
+  fecha_hemoglobina: "El tiempo transcurrido desde la prueba de hemoglobina se considera en la estimación del riesgo.",
+  fecha_prueba_hemoglobina: "El tiempo transcurrido desde la prueba de hemoglobina se considera en la estimación del riesgo.",
+  lugar_prueba_hemoglobina: "El lugar reportado de la prueba se considera según la ponderación definida por el motor.",
+}
+
+const normalizarClave = texto => String(texto ?? "")
+  .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  .toLowerCase().trim().replace(/[_-]+/g, " ").replace(/\s+/g, " ")
+
+const NOMBRES_CATEGORIAS = {
+  alimentacion: "Alimentación",
+  suplementacion: "Suplementación",
+  controles: "Controles de salud",
+  controles_de_salud: "Controles de salud",
+  "controles de salud": "Controles de salud",
+  higiene: "Higiene y saneamiento",
+  saneamiento: "Higiene y saneamiento",
+  "higiene y saneamiento": "Higiene y saneamiento",
+  higiene_y_saneamiento: "Higiene y saneamiento",
+  estimulacion: "Estimulación",
+  derivacion: "Derivación médica",
+  derivacion_medica: "Derivación médica",
+  "derivacion medica": "Derivación médica",
+  general: "General",
+}
+
+function categoriaLegible(categoria) {
+  const clave = normalizarClave(categoria)
+  const conocida = CATEGORIAS_RECOMENDACIONES.find(c =>
+    normalizarClave(c.id) === clave || normalizarClave(c.label) === clave
+  )
+  const claveConocida = conocida ? normalizarClave(conocida.id) : clave
+  const nombre = NOMBRES_CATEGORIAS[claveConocida] ?? NOMBRES_CATEGORIAS[clave]
+  if (nombre) return nombre
+  const texto = conocida?.label ?? String(categoria ?? "General").replaceAll("_", " ")
+  return texto.charAt(0).toLocaleUpperCase("es") + texto.slice(1).toLocaleLowerCase("es")
+}
+
+function explicarPuntaje(codigo, respuesta, puntaje) {
+  if (Number(puntaje) <= 0) return "No aporta puntos de riesgo según la regla individual aplicada."
+  const clave = String(codigo ?? "").toLowerCase().trim()
+  const respuestaTexto = String(respuesta ?? "").trim()
+  const respuestaNormalizada = normalizarClave(respuestaTexto)
+  if (clave === "valor_hemoglobina") {
+    if (respuestaNormalizada.includes("no sabe") || respuestaNormalizada.includes("no recuerda")) {
+      return "Se desconoce el valor de hemoglobina; el motor asigna puntos por información no disponible."
+    }
+    return "El valor de hemoglobina reportado es inferior a 11 g/dL, condición que el motor pondera como factor de riesgo."
+  }
+  if (["no sabe", "no se sabe", "no se sabe / no recuerda"].includes(respuestaNormalizada)) {
+    return "No se dispone de información sobre este factor; el motor asigna puntos por incertidumbre conforme a la regla establecida."
+  }
+  return MOTIVOS_RIESGO[clave] ?? "Esta respuesta cumple una condición de riesgo ponderada por el motor de reglas."
+}
+
 function DetalleEvaluacion({ ev }) {
   const [colapsadas, setColapsadas] = useState({})
 
@@ -50,6 +148,12 @@ function DetalleEvaluacion({ ev }) {
     : riesgoSeguro.charAt(0).toUpperCase() + riesgoSeguro.slice(1)
 
   const secciones = [...new Set((ev.reglasEvaluadas ?? []).map(r => r.seccion))]
+  const recomendacionesPorCategoria = (ev.recomendaciones ?? []).reduce((grupos, rec) => {
+    const nombre = categoriaLegible(rec.categoria)
+    if (!grupos[nombre]) grupos[nombre] = []
+    grupos[nombre].push(rec)
+    return grupos
+  }, {})
   function toggle(key) { setColapsadas(prev => ({ ...prev, [key]: !prev[key] })) }
 
   return (
@@ -87,38 +191,24 @@ function DetalleEvaluacion({ ev }) {
           </button>
           {!colapsadas["__recs"] && (
             <div className="divide-y divide-slate-100">
-              {ev.recomendaciones.map((rec, index) => {
-                const cat = CATEGORIAS_RECOMENDACIONES.find(c => c.id === rec.categoria)
-
-                const categoria =
-                  cat?.label ??
-                  rec.categoria?.replaceAll("_", " ") ??
-                  "General"
-
-                return (
-                  <div key={`${rec.categoria}-${rec.id ?? index}`} className="px-5 py-4">
-                    <p className="text-xs font-semibold text-slate-700 capitalize">
-                      {categoria}
-                    </p>
-
-                    {rec.titulo && (
-                      <p className="text-xs font-medium text-slate-600 mt-1">
-                        {rec.titulo}
-                      </p>
-                    )}
-
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {rec.texto}
-                    </p>
-
-                    {rec.tipo_recomendacion && (
-                      <p className="text-[10px] text-slate-400 mt-1">
-                        Aplica para: {rec.tipo_recomendacion}
-                      </p>
-                    )}
+              {Object.entries(recomendacionesPorCategoria).map(([categoria, items]) => (
+                <section key={categoria} className="px-5 py-4" aria-label={`Categoría: ${categoria}`}>
+                  <h3 className="text-xs font-semibold text-slate-700">{categoria}</h3>
+                  <div className="divide-y divide-slate-100 mt-2">
+                    {items.map((rec, index) => (
+                      <div key={`${rec.id ?? "recomendacion"}-${index}`} className="py-2">
+                        {rec.titulo && (
+                          <p className="text-xs font-medium text-slate-600">{rec.titulo}</p>
+                        )}
+                        <p className="text-xs text-slate-500 mt-0.5">{rec.texto}</p>
+                        {rec.tipo_recomendacion && (
+                          <p className="text-[10px] text-slate-400 mt-1">Aplica para: {rec.tipo_recomendacion}</p>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                )
-              })}
+                </section>
+              ))}
             </div>
           )}
         </div>
@@ -170,7 +260,7 @@ function DetalleEvaluacion({ ev }) {
                   <th className="text-left px-5 py-2.5 font-medium text-slate-500 w-1/4">Pregunta</th>
                   <th className="text-left px-5 py-2.5 font-medium text-slate-500 w-16">Respuesta</th>
                   <th className="text-left px-5 py-2.5 font-medium text-slate-500">¿Por qué suma puntos?</th>
-                  <th className="text-center px-5 py-2.5 font-medium text-slate-500">Regla activada</th>
+                  <th className="text-center px-5 py-2.5 font-medium text-slate-500">Regla con puntos</th>
                   <th className="text-center px-5 py-2.5 font-medium text-slate-500">Puntos</th>
                 </tr>
               </thead>
@@ -188,7 +278,7 @@ function DetalleEvaluacion({ ev }) {
                         <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">{respuestaLabel}</span>
                       </td>
                       <td className="px-5 py-3 text-slate-500">
-                        {r.activada ? r.descripcion : <span className="text-slate-300">No aplica — respuesta no genera riesgo.</span>}
+                        {r.activada ? r.descripcion : <span className="text-slate-400">No suma puntos en esta regla individual.</span>}
                       </td>
                       <td className="px-5 py-3 text-center">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.activada ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
@@ -455,7 +545,7 @@ async function cargarDetalleEvaluacion(evaluacionId) {
         seccion: "Evaluación",
         pregunta: r.texto_pregunta,
         respuesta: r.respuesta,
-        descripcion: `Respuesta registrada: ${r.respuesta}`,
+        descripcion: explicarPuntaje(r.codigo, r.respuesta, r.puntaje_obtenido),
         activada: Number(r.puntaje_obtenido) > 0,
         puntosObtenidos: r.puntaje_obtenido,
         puntos: r.puntaje_obtenido,
