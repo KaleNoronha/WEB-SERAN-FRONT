@@ -2,6 +2,15 @@ import { useState, useRef, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { ChevronDown } from "lucide-react"
 
+function normalizarBusqueda(texto) {
+  return String(texto ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ")
+}
+
 export default function SelectCustom({ placeholder, value, onChange, opciones, className = "w-full", disabled = false }) {
   const [abierto, setAbierto] = useState(false)
   const [busqueda, setBusqueda] = useState("")
@@ -11,10 +20,7 @@ export default function SelectCustom({ placeholder, value, onChange, opciones, c
 
   useEffect(() => {
     function handleClickOutside(e) {
-      if (
-        ref.current && !ref.current.contains(e.target) &&
-        (!portalRef.current || !portalRef.current.contains(e.target))
-      ) {
+      if (ref.current && !ref.current.contains(e.target) && (!portalRef.current || !portalRef.current.contains(e.target))) {
         setAbierto(false)
         setBusqueda("")
       }
@@ -23,7 +29,6 @@ export default function SelectCustom({ placeholder, value, onChange, opciones, c
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  // El estado disabled también debe cerrar el menú (renderizado en un portal).
   useEffect(() => {
     if (disabled) {
       setAbierto(false)
@@ -41,7 +46,12 @@ export default function SelectCustom({ placeholder, value, onChange, opciones, c
   }
 
   const seleccionado = opciones.find(o => o.value === value)
-  const opcionesFiltradas = opciones.filter(o => o.label.toLowerCase().includes(busqueda.toLowerCase()))
+  const tokens = normalizarBusqueda(busqueda).split(" ").filter(Boolean)
+  // Permite 'Juan Perez' en 'Juan Carlos Perez López', sin exigir palabras contiguas.
+  const opcionesFiltradas = opciones.filter(o => {
+    const palabras = normalizarBusqueda(o.label).split(" ")
+    return tokens.every(token => palabras.some(palabra => palabra.startsWith(token)))
+  })
 
   function seleccionar(opcion) {
     if (disabled) return
@@ -67,27 +77,15 @@ export default function SelectCustom({ placeholder, value, onChange, opciones, c
         </button>
       </div>
       {abierto && !disabled && createPortal(
-        <div
-          ref={portalRef}
-          className="fixed bg-white border border-slate-100 rounded-xl shadow-xl z-[9999] overflow-y-auto max-h-48"
-          style={{ top: pos.top, left: pos.left, width: pos.width }}
-        >
+        <div ref={portalRef} className="fixed bg-white border border-slate-100 rounded-xl shadow-xl z-[9999] overflow-y-auto max-h-48" style={{ top: pos.top, left: pos.left, width: pos.width }}>
           {opcionesFiltradas.length === 0 ? (
             <p className="px-4 py-2.5 text-xs text-slate-400">Sin coincidencias</p>
-          ) : (
-            opcionesFiltradas.map(o => (
-              <button
-                key={o.value}
-                type="button"
-                onMouseDown={e => { e.preventDefault(); seleccionar(o) }}
-                className={`w-full text-left px-4 py-2.5 text-xs transition-colors hover:bg-slate-50 ${value === o.value ? "text-slate-800 font-medium" : "text-slate-600"}`}
-              >
-                {o.label}
-              </button>
-            ))
-          )}
-        </div>,
-        document.body
+          ) : opcionesFiltradas.map(o => (
+            <button key={o.value} type="button" onMouseDown={e => { e.preventDefault(); seleccionar(o) }} className={`w-full text-left px-4 py-2.5 text-xs transition-colors hover:bg-slate-50 ${value === o.value ? "text-slate-800 font-medium" : "text-slate-600"}`}>
+              {o.label}
+            </button>
+          ))}
+        </div>, document.body
       )}
     </div>
   )

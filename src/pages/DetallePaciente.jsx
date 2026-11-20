@@ -220,11 +220,35 @@ export default function DetallePaciente() {
   const [detalleEvaluacionBackend, setDetalleEvaluacionBackend] = useState(null)
   const [cargandoDetalleEvaluacion, setCargandoDetalleEvaluacion] = useState(false)
   const location = useLocation()
-  const [tab, setTab] = useState(location.state?.tab ?? "datos")
+  const parametrosIniciales = new URLSearchParams(location.search)
+  const [tab, setTab] = useState(parametrosIniciales.get("tab") ?? location.state?.tab ?? "datos")
   const [evalIdx, setEvalIdx] = useState(location.state?.evalIdx ?? null)
   const [evaluacionSeleccionadaId, setEvaluacionSeleccionadaId] = useState(
-    location.state?.evaluacionId ?? null
+    parametrosIniciales.get("evaluacionId") ?? location.state?.evaluacionId ?? null
   )
+  function cambiarVista(nuevaTab, nuevaEvaluacionId = evaluacionSeleccionadaId) {
+    const parametros = new URLSearchParams()
+    if (nuevaTab !== "datos") parametros.set("tab", nuevaTab)
+    if (nuevaEvaluacionId && nuevaTab === "detalle") parametros.set("evaluacionId", String(nuevaEvaluacionId))
+    navigate({ pathname: location.pathname, search: parametros.toString() ? `?${parametros}` : "" }, { state: null })
+    setTab(nuevaTab)
+  }
+
+  // Restaurar la pestaña y evaluación desde la URL al recargar o volver atrás.
+  useEffect(() => {
+    const parametros = new URLSearchParams(location.search)
+    const tabURL = parametros.get("tab")
+    const evaluacionURL = parametros.get("evaluacionId")
+    if (tabURL) setTab(tabURL)
+    else if (!location.state?.tab) setTab("datos")
+    if (evaluacionURL) {
+      setEvaluacionSeleccionadaId(evaluacionURL)
+      cargarDetalleEvaluacion(evaluacionURL)
+    } else if (tabURL !== "detalle") {
+      setDetalleEvaluacionBackend(null)
+    }
+  }, [location.search, id])
+
   const [editando, setEditando] = useState(false)
   const [exito, setExito] = useState(false)
   const [exitoVisible, setExitoVisible] = useState(false)
@@ -279,10 +303,10 @@ export default function DetallePaciente() {
       cargarDetalleEvaluacion(location.state.evaluacionId)
 
       if (location.state.abrirDetalle) {
-        setTab("detalle")
+        cambiarVista("detalle", location.state.evaluacionId)
       }
     }
-  }, [location.state, historialEvaluaciones.length])
+  }, [location.state?.evaluacionId, historialEvaluaciones.length])
 
 useEffect(() => {
   if (!paciente) return
@@ -369,12 +393,31 @@ async function cargarEvaluacionesPaciente() {
         riesgo,
         estado,
         recomendaciones: [],
+        cantidadRecomendaciones: estado === "culminada" ? null : 0,
         reglasEvaluadas: [],
         respuestas: {}
       }
     })
 
     setEvaluacionesBackend(evaluacionesMapeadas)
+
+    // El resumen no incluye recomendaciones: consultar el detalle real en vez de inferir "No".
+    // No bloquea la lista mientras se obtiene la información.
+    const culminadas = evaluacionesMapeadas.filter(ev => ev.estado === "culminada")
+    for (let inicio = 0; inicio < culminadas.length; inicio += 5) {
+      const lote = culminadas.slice(inicio, inicio + 5)
+      await Promise.all(lote.map(async ev => {
+        try {
+          const detalle = await api.get(`/api/evaluaciones/${ev.id}`)
+          const cantidad = (detalle.data.recomendaciones ?? []).length
+          setEvaluacionesBackend(prev => prev.map(item => item.id === ev.id
+            ? { ...item, cantidadRecomendaciones: cantidad }
+            : item))
+        } catch (error) {
+          console.error(`No se pudieron verificar recomendaciones de evaluación ${ev.id}`, error)
+        }
+      }))
+    }
   } catch (error) {
     console.error("Error al cargar evaluaciones:", error)
     setEvaluacionesBackend([])
@@ -579,10 +622,10 @@ function continuarEvaluacion(evaluacionId) {
         </div>
 
         <div className="flex items-center gap-1 border-b border-slate-200">
-          {[["datos", "Datos"], ["evaluaciones", "Historial de evaluaciones"], ...(evalIdx !== null ? [["detalle", "Detalle de evaluación"]] : [])].map(([key, label]) => (
+          {[["datos", "Datos"], ["evaluaciones", "Historial de evaluaciones"], ...(evaluacionSeleccionadaId !== null ? [["detalle", "Detalle de evaluación"]] : [])].map(([key, label]) => (
             <button
               key={key}
-              onClick={() => setTab(key)}
+              onClick={() => cambiarVista(key)}
               className={`px-4 py-2.5 text-xs font-medium transition-colors border-b-2 -mb-px ${
                 tab === key ? "border-slate-800 text-slate-800" : "border-transparent text-slate-400 hover:text-slate-600"
               }`}
@@ -775,9 +818,11 @@ function continuarEvaluacion(evaluacionId) {
 
                       <td className="px-4 py-3">
                         {ev.estado === "culminada" ? (
-                          ev.recomendaciones?.length > 0
-                            ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">Sí</span>
-                            : <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-400">No</span>
+                          ev.cantidadRecomendaciones === null || ev.cantidadRecomendaciones === undefined
+                            ? <span className="text-slate-400">Verificando...</span>
+                            : ev.cantidadRecomendaciones > 0
+                              ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">Sí ({ev.cantidadRecomendaciones})</span>
+                              : <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-400">No</span>
                         ) : (
                           <span className="text-slate-300">—</span>
                         )}
@@ -796,7 +841,7 @@ function continuarEvaluacion(evaluacionId) {
                               setEvalIdx(i)
                               setEvaluacionSeleccionadaId(ev.id)
                               cargarDetalleEvaluacion(ev.id)
-                              setTab("detalle")
+                              cambiarVista("detalle", ev.id)
                             }}
                             className="text-slate-500 hover:text-slate-800 transition-colors"
                           >
