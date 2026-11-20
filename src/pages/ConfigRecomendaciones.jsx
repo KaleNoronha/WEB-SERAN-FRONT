@@ -33,6 +33,36 @@ export default function ConfigRecomendaciones() {
     categoria: "alimentacion",
   })
   const [errorReco, setErrorReco] = useState("")
+  const [erroresCampos, setErroresCampos] = useState({})
+  const [notificacion, setNotificacion] = useState(null)
+
+  function mostrarNotificacion(mensaje, tipo = "exito") {
+    setNotificacion({ mensaje, tipo })
+  }
+
+  function validarFormulario(datos) {
+    const errores = {}
+    if (!datos.titulo?.trim()) errores.titulo = "Ingresa un título."
+    if (!datos.descripcion?.trim()) errores.descripcion = "Ingresa una descripción."
+    if (!["Riesgo bajo", "Riesgo moderado", "Riesgo alto"].includes(datos.tipo_recomendacion)) {
+      errores.tipo_recomendacion = "Selecciona un tipo de recomendación válido."
+    }
+    if (!CATEGORIAS_RECOMENDACIONES.some(cat => cat.id === datos.categoria)) {
+      errores.categoria = "Selecciona una categoría válida."
+    }
+    setErroresCampos(errores)
+    return Object.keys(errores).length === 0
+  }
+
+  function actualizarCampoCrear(campo, valor) {
+    setFormReco(prev => ({ ...prev, [campo]: valor }))
+    setErroresCampos(prev => ({ ...prev, [campo]: undefined }))
+  }
+
+  function actualizarCampoEditar(campo, valor) {
+    setRecomendacionEditando(prev => ({ ...prev, [campo]: valor }))
+    setErroresCampos(prev => ({ ...prev, [campo]: undefined }))
+  }
 
   const modificado = CATEGORIAS_RECOMENDACIONES.some(c => draft[c.id] !== config[c.id])
   const activasCount = CATEGORIAS_RECOMENDACIONES.filter(c => draft[c.id]).length
@@ -104,15 +134,7 @@ export default function ConfigRecomendaciones() {
     e.preventDefault()
     setErrorReco("")
 
-    if (!formReco.titulo.trim()) {
-      setErrorReco("Ingresa un título.")
-      return
-    }
-
-    if (!formReco.descripcion.trim()) {
-      setErrorReco("Ingresa una descripción.")
-      return
-    }
+    if (!validarFormulario(formReco)) return
 
     try {
       setGuardando(true)
@@ -133,6 +155,7 @@ export default function ConfigRecomendaciones() {
       })
 
       await cargarRecomendaciones()
+      mostrarNotificacion("Recomendación creada correctamente.")
     } catch (error) {
       console.error("Error al crear recomendación:", error)
       setErrorReco("No se pudo crear la recomendación.")
@@ -151,6 +174,7 @@ export default function ConfigRecomendaciones() {
       estado: rec.estado ?? true,
     })
     setErrorReco("")
+    setErroresCampos({})
     setModalEditar(true)
   }
 
@@ -158,15 +182,7 @@ export default function ConfigRecomendaciones() {
     e.preventDefault()
     setErrorReco("")
 
-    if (!recomendacionEditando.titulo.trim()) {
-      setErrorReco("Ingresa un título.")
-      return
-    }
-
-    if (!recomendacionEditando.descripcion.trim()) {
-      setErrorReco("Ingresa una descripción.")
-      return
-    }
+    if (!validarFormulario(recomendacionEditando)) return
 
     try {
       setGuardando(true)
@@ -184,6 +200,7 @@ export default function ConfigRecomendaciones() {
       setErrorReco("")
 
       await cargarRecomendaciones()
+      mostrarNotificacion("Recomendación actualizada correctamente.")
     } catch (error) {
       console.error("Error al editar recomendación:", error)
       setErrorReco("No se pudo editar la recomendación.")
@@ -201,10 +218,12 @@ export default function ConfigRecomendaciones() {
       await api.delete(`/api/recomendaciones/${modalEliminar.id}`)
 
       setModalEliminar(null)
+      setErrorReco("")
       await cargarRecomendaciones()
+      mostrarNotificacion("Recomendación desactivada correctamente.")
     } catch (error) {
       console.error("Error al eliminar recomendación:", error)
-      setErrorReco("No se pudo eliminar la recomendación.")
+      setErrorReco("No se pudo desactivar la recomendación.")
     } finally {
       setGuardando(false)
     }
@@ -223,9 +242,10 @@ export default function ConfigRecomendaciones() {
       })
 
       await cargarRecomendaciones()
+      mostrarNotificacion("Recomendación activada correctamente.")
     } catch (error) {
       console.error("Error al activar recomendación:", error)
-      setErrorReco("No se pudo activar la recomendación.")
+      mostrarNotificacion("No se pudo activar la recomendación.", "error")
     } finally {
       setGuardando(false)
     }
@@ -269,6 +289,12 @@ export default function ConfigRecomendaciones() {
             </button>
           ))}
         </div>
+        {notificacion && (
+          <div role="status" className={`flex items-center justify-between gap-3 text-xs px-3 py-2 rounded-lg border ${notificacion.tipo === "error" ? "bg-red-50 text-red-700 border-red-200" : "bg-green-50 text-green-700 border-green-200"}`}>
+            <span>{notificacion.mensaje}</span>
+            <button type="button" onClick={() => setNotificacion(null)} aria-label="Cerrar notificación" className="font-semibold">×</button>
+          </div>
+        )}
         {exito && <p className="text-xs px-3 py-2 rounded-lg border bg-green-50 text-green-700 border-green-200">Configuración guardada correctamente.</p>}
         {errorConfig && <p className="text-xs text-red-700">{errorConfig}</p>}
         {pestana === "categorias" && (
@@ -311,7 +337,7 @@ export default function ConfigRecomendaciones() {
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs text-slate-500">{filtradas.length} de {recomendaciones.length} recomendaciones</p>
-              {esAdmin && <button type="button" onClick={() => setModalCrear(true)}
+              {esAdmin && <button type="button" onClick={() => { setErroresCampos({}); setErrorReco(""); setModalCrear(true) }}
                 className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium px-4 py-2 rounded-lg">Nueva recomendación</button>}
             </div>
             <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
@@ -397,10 +423,11 @@ export default function ConfigRecomendaciones() {
                 <input
                   type="text"
                   value={formReco.titulo}
-                  onChange={e => setFormReco(prev => ({ ...prev, titulo: e.target.value }))}
+                  onChange={e => actualizarCampoCrear("titulo", e.target.value)}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
                   placeholder="Ej: Mejorar alimentación rica en hierro"
                 />
+                {erroresCampos.titulo && <p role="alert" className="text-xs text-red-700 mt-1">{erroresCampos.titulo}</p>}
               </div>
 
               <div>
@@ -409,10 +436,11 @@ export default function ConfigRecomendaciones() {
                 </label>
                 <textarea
                   value={formReco.descripcion}
-                  onChange={e => setFormReco(prev => ({ ...prev, descripcion: e.target.value }))}
+                  onChange={e => actualizarCampoCrear("descripcion", e.target.value)}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-slate-500 min-h-24"
                   placeholder="Describe la recomendación..."
                 />
+                {erroresCampos.descripcion && <p role="alert" className="text-xs text-red-700 mt-1">{erroresCampos.descripcion}</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -422,13 +450,14 @@ export default function ConfigRecomendaciones() {
                   </label>
                   <select
                     value={formReco.tipo_recomendacion}
-                    onChange={e => setFormReco(prev => ({ ...prev, tipo_recomendacion: e.target.value }))}
+                    onChange={e => actualizarCampoCrear("tipo_recomendacion", e.target.value)}
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
                   >
                     <option value="Riesgo bajo">Riesgo bajo</option>
                     <option value="Riesgo moderado">Riesgo moderado</option>
                     <option value="Riesgo alto">Riesgo alto</option>
                   </select>
+                  {erroresCampos.tipo_recomendacion && <p role="alert" className="text-xs text-red-700 mt-1">{erroresCampos.tipo_recomendacion}</p>}
                 </div>
 
                 <div>
@@ -437,7 +466,7 @@ export default function ConfigRecomendaciones() {
                   </label>
                   <select
                     value={formReco.categoria}
-                    onChange={e => setFormReco(prev => ({ ...prev, categoria: e.target.value }))}
+                    onChange={e => actualizarCampoCrear("categoria", e.target.value)}
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
                   >
                     {CATEGORIAS_RECOMENDACIONES.map(cat => (
@@ -446,6 +475,7 @@ export default function ConfigRecomendaciones() {
                       </option>
                     ))}
                   </select>
+                  {erroresCampos.categoria && <p role="alert" className="text-xs text-red-700 mt-1">{erroresCampos.categoria}</p>}
                 </div>
               </div>
               
@@ -459,6 +489,7 @@ export default function ConfigRecomendaciones() {
                   onClick={() => {
                     setModalCrear(false)
                     setErrorReco("")
+                    setErroresCampos({})
                     setFormReco({
                       titulo: "",
                       descripcion: "",
@@ -500,39 +531,42 @@ export default function ConfigRecomendaciones() {
                 <input
                   type="text"
                   value={recomendacionEditando.titulo}
-                  onChange={e => setRecomendacionEditando(prev => ({ ...prev, titulo: e.target.value }))}
+                  onChange={e => actualizarCampoEditar("titulo", e.target.value)}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
                 />
+                {erroresCampos.titulo && <p role="alert" className="text-xs text-red-700 mt-1">{erroresCampos.titulo}</p>}
               </div>
 
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">Descripción</label>
                 <textarea
                   value={recomendacionEditando.descripcion}
-                  onChange={e => setRecomendacionEditando(prev => ({ ...prev, descripcion: e.target.value }))}
+                  onChange={e => actualizarCampoEditar("descripcion", e.target.value)}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-slate-500 min-h-24"
                 />
+                {erroresCampos.descripcion && <p role="alert" className="text-xs text-red-700 mt-1">{erroresCampos.descripcion}</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Tipo</label>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Tipo de recomendación</label>
                   <select
                     value={recomendacionEditando.tipo_recomendacion}
-                    onChange={e => setRecomendacionEditando(prev => ({ ...prev, tipo_recomendacion: e.target.value }))}
+                    onChange={e => actualizarCampoEditar("tipo_recomendacion", e.target.value)}
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
                   >
                     <option value="Riesgo bajo">Riesgo bajo</option>
                     <option value="Riesgo moderado">Riesgo moderado</option>
                     <option value="Riesgo alto">Riesgo alto</option>
                   </select>
+                {erroresCampos.tipo_recomendacion && <p role="alert" className="text-xs text-red-700 mt-1">{erroresCampos.tipo_recomendacion}</p>}
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">Categoría</label>
                   <select
                     value={recomendacionEditando.categoria}
-                    onChange={e => setRecomendacionEditando(prev => ({ ...prev, categoria: e.target.value }))}
+                    onChange={e => actualizarCampoEditar("categoria", e.target.value)}
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
                   >
                     {CATEGORIAS_RECOMENDACIONES.map(cat => (
@@ -541,6 +575,7 @@ export default function ConfigRecomendaciones() {
                       </option>
                     ))}
                   </select>
+                {erroresCampos.categoria && <p role="alert" className="text-xs text-red-700 mt-1">{erroresCampos.categoria}</p>}
                 </div>
               </div>
 
@@ -564,6 +599,7 @@ export default function ConfigRecomendaciones() {
                     setModalEditar(false)
                     setRecomendacionEditando(null)
                     setErrorReco("")
+                    setErroresCampos({})
                   }}
                   className="text-xs text-slate-600 hover:text-slate-800 px-4 py-2"
                 >
